@@ -42,7 +42,7 @@ def welcome():
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
         f"/api/v1.0/<start><br/>"
-        f"/api/v1.0/<start>/<end><br/>"
+        f"/api/v1.0/<start>/<end>"
     )
 
 @app.route("/api/v1.0/precipitation")
@@ -86,8 +86,10 @@ def temperatures():
     session = Session(engine)
 
     # Query all stations
+    prev_year = dt.date(2017, 8, 23) - dt.timedelta(days=365)
+
     sel = [Measurement.date, Measurement.tobs]
-    results = session.query(*sel).filter(Measurement.date > '2016-08-23').filter(Measurement.station == 'USC00519281').all()
+    results = session.query(*sel).filter(Measurement.date >= prev_year).filter(Measurement.station == 'USC00519281').all()
 
     session.close()
 
@@ -96,23 +98,35 @@ def temperatures():
 
     return jsonify(all_temperatures)
 
-@app.route("/api/v1.0/<start>")
-def calc_start():
+@app.route("/api/v1.0/<start_date>")
+def calc_start(start_date):
 
 # Create our session (link) from Python to the DB
     session = Session(engine)
     
-    start_date = '%Y-%m-%d'
+    dates = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
+    filter(Measurement.date >= start_date).all()
 
+    session.close()
     
-    for start_date in dates:
-        
-        dates = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
-        filter(Measurement.date >= start_date).all()
-        
-        return jsonify(dates)
-    
-        return jsonify({"error": f"{dates} not found."}), 404
+    return jsonify(dates)
 
+    return jsonify({"error": f"{dates} not found."}), 404
+
+@app.route("/api/v1.0/<start_date>/<end_date>")
+def calc_start_end(start_date, end_date):
+
+# Create our session (link) from Python to the DB
+    session = Session(engine)
+    
+    dates = session.query(func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)).\
+    filter(Measurement.date >= start_date).filter(Measurement.date <= end_date).all()
+
+    session.close()
+    
+    return jsonify(dates)
+
+    return jsonify({"error": f"{dates} not found."}), 404
+        
 if __name__ == '__main__':
     app.run(debug=True)
